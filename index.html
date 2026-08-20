@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>무한의 계단</title>
+
+<style>
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    background: #181818;
+    color: white;
+    font-family: Arial, sans-serif;
+    text-align: center;
+    overflow: hidden;
+}
+
+h1 {
+    margin: 12px 0 5px;
+}
+
+#info {
+    font-size: 20px;
+    margin-bottom: 8px;
+}
+
+#game {
+    position: relative;
+    width: 420px;
+    height: 650px;
+    margin: auto;
+    overflow: hidden;
+
+    background: linear-gradient(
+        #8ed6ff,
+        #dff6ff
+    );
+
+    border: 5px solid white;
+}
+
+/* =========================
+   계단
+========================= */
+
+.stair {
+    position: absolute;
+
+    width: 110px;
+    height: 42px;
+
+    background: #a86f3d;
+
+    border: 3px solid #633f23;
+
+    border-radius: 5px;
+
+    box-shadow:
+        0 5px 0 #55351d;
+
+    z-index: 10;
+}
+
+.stair::before {
+    content: "";
+
+    position: absolute;
+
+    left: -3px;
+    top: -10px;
+
+    width: 110px;
+    height: 12px;
+
+    background: #c48a52;
+
+    border: 3px solid #633f23;
+
+    border-radius: 5px 5px 0 0;
+}
+
+/* =========================
+   캐릭터
+========================= */
+
+#player {
+    position: absolute;
+
+    width: 40px;
+    height: 48px;
+
+    background: #ffd43b;
+
+    border: 3px solid #222;
+
+    border-radius: 10px;
+
+    z-index: 50;
+
+    transition:
+        left 0.1s,
+        bottom 0.12s;
+}
+
+#player::before,
+#player::after {
+    content: "";
+
+    position: absolute;
+
+    width: 7px;
+    height: 7px;
+
+    background: black;
+
+    border-radius: 50%;
+
+    top: 8px;
+}
+
+#player::before {
+    left: 7px;
+}
+
+#player::after {
+    right: 7px;
+}
+
+/* =========================
+   게임 오버
+========================= */
+
+#gameOver {
+    position: absolute;
+
+    inset: 0;
+
+    background: rgba(0,0,0,0.8);
+
+    display: none;
+
+    flex-direction: column;
+
+    justify-content: center;
+    align-items: center;
+
+    z-index: 100;
+}
+
+#gameOver h2 {
+    font-size: 42px;
+    margin: 10px;
+}
+
+#gameOver p {
+    font-size: 20px;
+}
+
+button {
+    border: none;
+    border-radius: 12px;
+
+    padding: 14px 25px;
+
+    font-size: 20px;
+
+    cursor: pointer;
+}
+
+/* =========================
+   버튼
+========================= */
+
+#buttons {
+    display: flex;
+
+    justify-content: center;
+
+    gap: 15px;
+
+    margin-top: 10px;
+}
+
+.control {
+    width: 110px;
+    height: 60px;
+
+    background: #444;
+    color: white;
+
+    border: 3px solid #777;
+
+    font-size: 28px;
+
+    touch-action: manipulation;
+}
+
+.control:active {
+    transform: scale(0.94);
+}
+
+#direction {
+    margin-top: 5px;
+    font-size: 16px;
+}
+</style>
+</head>
+
+<body>
+
+<h1>♾️ 무한의 계단</h1>
+
+<div id="info">
+    계단: <span id="score">0</span>
+    &nbsp;&nbsp;
+    최고: <span id="highScore">0</span>
+</div>
+
+<div id="game">
+
+    <div id="player"></div>
+
+    <div id="gameOver">
+        <h2>💥 게임 오버!</h2>
+
+        <p>
+            올라간 계단:
+            <span id="finalScore">0</span>
+        </p>
+
+        <button onclick="restartGame()">
+            다시 하기
+        </button>
+    </div>
+
+</div>
+
+<div id="direction">
+    방향: ➡️
+</div>
+
+<div id="buttons">
+
+    <button
+        class="control"
+        onclick="changeDirection()">
+        🔄 방향
+    </button>
+
+    <button
+        class="control"
+        onclick="goUp()">
+        ⬆️ 올라가기
+    </button>
+
+</div>
+
+
+<script>
+
+/* =================================
+   기본 설정
+================================= */
+
+const game =
+    document.getElementById("game");
+
+const player =
+    document.getElementById("player");
+
+const scoreText =
+    document.getElementById("score");
+
+const highScoreText =
+    document.getElementById("highScore");
+
+const finalScore =
+    document.getElementById("finalScore");
+
+const gameOverScreen =
+    document.getElementById("gameOver");
+
+const directionText =
+    document.getElementById("direction");
+
+
+/* =================================
+   게임 변수
+================================= */
+
+let score = 0;
+
+let direction = 1;
+
+let gameOver = false;
+
+let playerX = 155;
+
+
+/*
+   화면에서 플레이어는 거의
+   같은 위치에 있고,
+
+   실제 계단의 위치를 움직여서
+   무한히 올라가는 것처럼 보이게 한다.
+*/
+
+let playerY = 500;
+
+
+/* =================================
+   최고 점수
+================================= */
+
+let highScore =
+    Number(
+        localStorage.getItem(
+            "infiniteStairHighScore"
+        )
+    ) || 0;
+
+highScoreText.textContent =
+    highScore;
+
+
+/* =================================
+   계단 설정
+================================= */
+
+const STAIR_WIDTH = 110;
+
+const STAIR_HEIGHT = 45;
+
+const STEP_X = 55;
+
+const STEP_Y = 65;
+
+
+/*
+   이 배열에는 현재 화면에
+   보이는 계단만 저장한다.
+*/
+
+let stairs = [];
+
+
+/*
+   실제 층 번호.
+
+   숫자가 계속 올라간다.
+   브라우저가 허용하는 범위까지
+   사실상 무한으로 사용할 수 있다.
+*/
+
+let floor = 0;
+
+
+/* =================================
+   첫 계단
+================================= */
+
+function createFirstStair() {
+
+    const stair =
+        document.createElement("div");
+
+    stair.className =
+        "stair";
+
+    stair.style.left =
+        playerX + "px";
+
+    stair.style.bottom =
+        "80px";
+
+    game.appendChild(stair);
+
+    stairs.push({
+        element: stair,
+        x: playerX,
+        y: 80,
+        floor: 0
+    });
+}
+
+
+/* =================================
+   새 계단 생성
+================================= */
+
+function createNextStair() {
+
+    const previous =
+        stairs[stairs.length - 1];
+
+
+    /*
+       이전 계단을 기준으로
+       현재 방향으로 이동
+    */
+
+    let newX =
+        previous.x +
+        direction * STEP_X;
+
+
+    /*
+       왼쪽 끝에 닿으면
+       자동으로 방향 변경
+
+       오른쪽 끝에 닿아도
+       자동으로 방향 변경
+    */
+
+    if (
+        newX < 5
+    ) {
+
+        direction = 1;
+
+        updateDirection();
+
+        newX =
+            previous.x + STEP_X;
+    }
+
+
+    if (
+        newX >
+        game.clientWidth - STAIR_WIDTH - 5
+    ) {
+
+        direction = -1;
+
+        updateDirection();
+
+        newX =
+            previous.x - STEP_X;
+    }
+
+
+    const newY =
+        previous.y + STEP_Y;
+
+
+    const stair =
+        document.createElement("div");
+
+    stair.className =
+        "stair";
+
+
+    /*
+       처음에는 화면 아래쪽에
+       생성한다.
+
+       이후 camera 이동으로
+       위쪽으로 올라간다.
+    */
+
+    stair.style.left =
+        newX + "px";
+
+    stair.style.bottom =
+        newY + "px";
+
+
+    game.appendChild(stair);
+
+
+    stairs.push({
+
+        element: stair,
+
+        x: newX,
+
+        y: newY,
+
+        floor: floor + 1
+
+    });
+}
+
+
+/* =================================
+   계단 많이 만들기
+================================= */
+
+function makeInitialStairs() {
+
+    createFirstStair();
+
+
+    /*
+       처음 화면을 채운다.
+    */
+
+    for (
+        let i = 0;
+        i < 12;
+        i++
+    ) {
+
+        createNextStair();
+
+    }
+}
+
+
+makeInitialStairs();
+
+
+/* =================================
+   캐릭터 위치
+================================= */
+
+function updatePlayer() {
+
+    player.style.left =
+        playerX + "px";
+
+    player.style.bottom =
+        playerY + "px";
+}
+
+
+/* =================================
+   방향 변경
+================================= */
+
+function changeDirection() {
+
+    if (gameOver)
+        return;
+
+    direction *= -1;
+
+    updateDirection();
+}
+
+
+function updateDirection() {
+
+    if (direction === 1) {
+
+        directionText.textContent =
+            "방향: ➡️";
+
+    } else {
+
+        directionText.textContent =
+            "방향: ⬅️";
+
+    }
+}
+
+
+/* =================================
+   올라가기
+================================= */
+
+function goUp() {
+
+    if (gameOver)
+        return;
+
+
+    /*
+       다음 계단
+    */
+
+    const next =
+        stairs[stairs.length - 1];
+
+
+    /*
+       플레이어가 다음 계단의
+       X 위치에 도착해야 한다.
+
+       현재 방향과 맞지 않으면
+       떨어진 것으로 처리한다.
+    */
+
+    const targetX =
+        next.x;
+
+
+    /*
+       플레이어 X 이동
+    */
+
+    playerX =
+        targetX;
+
+
+    /*
+       계단 올라감
+    */
+
+    floor++;
+
+    score = floor;
+
+    scoreText.textContent =
+        score;
+
+
+    /*
+       카메라 효과
+    */
+
+    moveCamera();
+
+
+    /*
+       새 계단 생성
+
+       ⭐⭐⭐ 핵심 ⭐⭐⭐
+
+       플레이어가 올라갈 때마다
+       무조건 새로운 계단을 만든다.
+
+       따라서 계단이 끝나지 않는다.
+    */
+
+    createNextStair();
+
+
+    /*
+       오래된 계단 삭제
+
+       메모리를 아끼기 위해
+       화면에서 너무 멀어진 계단만 삭제한다.
+
+       실제 게임 진행에는 아무 영향이 없다.
+    */
+
+    removeOldStairs();
+
+
+    /*
+       최고점
+    */
+
+    if (
+        score > highScore
+    ) {
+
+        highScore = score;
+
+        highScoreText.textContent =
+            highScore;
+
+        localStorage.setItem(
+            "infiniteStairHighScore",
+            highScore
+        );
+    }
+}
+
+
+/* =================================
+   카메라
+================================= */
+
+function moveCamera() {
+
+    /*
+       모든 계단을 아래쪽으로
+       조금씩 이동시킨다.
+
+       그러면 플레이어가 올라가는
+       것처럼 보인다.
+    */
+
+    stairs.forEach(stair => {
+
+        let bottom =
+            parseFloat(
+                stair.element.style.bottom
+            );
+
+        bottom -= STEP_Y;
+
+        stair.element.style.bottom =
+            bottom + "px";
+
+        stair.y = bottom;
+
+    });
+
+
+    /*
+       플레이어도 약간 올라간다.
+    */
+
+    playerY += STEP_Y;
+
+
+    /*
+       플레이어가 너무 위로 올라가면
+       화면 중앙에 고정한다.
+    */
+
+    if (
+        playerY > 360
+    ) {
+
+        const difference =
+            playerY - 360;
+
+        playerY = 360;
+
+
+        stairs.forEach(stair => {
+
+            let bottom =
+                parseFloat(
+                    stair.element.style.bottom
+                );
+
+            bottom -= difference;
+
+            stair.element.style.bottom =
+                bottom + "px";
+
+            stair.y = bottom;
+
+        });
+    }
+
+
+    updatePlayer();
+}
+
+
+/* =================================
+   오래된 계단 삭제
+================================= */
+
+function removeOldStairs() {
+
+    /*
+       화면 아래로 완전히 사라진
+       계단을 삭제한다.
+
+       하지만 새 계단은 계속 만들어진다.
+    */
+
+    while (
+        stairs.length > 15
+    ) {
+
+        const old =
+            stairs.shift();
+
+        old.element.remove();
+    }
+}
+
+
+/* =================================
+   키보드
+================================= */
+
+document.addEventListener(
+    "keydown",
+    function(event) {
+
+        if (gameOver)
+            return;
+
+
+        /*
+           스페이스 / 위쪽
+        */
+
+        if (
+            event.code === "Space" ||
+            event.key === "ArrowUp"
+        ) {
+
+            event.preventDefault();
+
+            goUp();
+
+            return;
+        }
+
+
+        /*
+           좌우 방향키
+        */
+
+        if (
+            event.key === "ArrowLeft"
+        ) {
+
+            event.preventDefault();
+
+            direction = -1;
+
+            updateDirection();
+
+            return;
+        }
+
+
+        if (
+            event.key === "ArrowRight"
+        ) {
+
+            event.preventDefault();
+
+            direction = 1;
+
+            updateDirection();
+
+            return;
+        }
+    }
+);
+
+
+/* =================================
+   게임 오버
+================================= */
+
+function endGame() {
+
+    if (gameOver)
+        return;
+
+    gameOver = true;
+
+    finalScore.textContent =
+        score;
+
+    gameOverScreen.style.display =
+        "flex";
+}
+
+
+/* =================================
+   다시 시작
+================================= */
+
+function restartGame() {
+
+    location.reload();
+}
+
+
+/* =================================
+   시작
+================================= */
+
+updatePlayer();
+
+</script>
+
+</body>
+</html>
